@@ -130,9 +130,14 @@ async def shopee_webhook(request: Request):
     try:
         data = await request.json()
         code = data.get("code")
+        shop_id = data.get("shop_id")
+        print(f"[Shopee Webhook] 受信 code={code} shop_id={shop_id} data={data}")
 
         if code == 10:  # webchat_push
+            print(f"[Shopee Webhook] チャットメッセージ受信 shop_id={shop_id}")
             await handle_shopee_chat_push(data)
+        else:
+            print(f"[Shopee Webhook] チャット以外のイベント code={code} スキップ")
 
         return {"status": "ok"}
     except Exception as e:
