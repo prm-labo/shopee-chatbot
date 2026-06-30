@@ -3,7 +3,7 @@ import time
 import secrets
 from contextlib import contextmanager
 
-DB_PATH = "/data/chatbot.db"
+DB_PATH = "chatbot.db"
 
 @contextmanager
 def get_conn():
