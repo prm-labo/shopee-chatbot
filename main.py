@@ -169,22 +169,28 @@ async def handle_shopee_chat_push(data: dict):
         return
 
     if is_message_processed(shop_id, message_id):
+        print(f"[Webhook] 処理済みメッセージのためスキップ message_id={message_id}")
         return
 
     mark_message_processed(shop_id, message_id)
 
     user = get_user_by_shop_id(shop_id)
     if not user:
+        print(f"[Webhook] DBにユーザーなし shop_id={shop_id} - OAuth再連携が必要")
         return
+
+    print(f"[Webhook] ユーザー確認 shop_id={shop_id} line_user_id={user['line_user_id']}")
 
     school_faq = get_school_faq()
     product_data = user["product_cache"] or ""
 
     response, is_confident = await generate_response(buyer_message, school_faq, product_data)
+    print(f"[Webhook] Claude判定 is_confident={is_confident} response_preview={response[:80] if response else 'なし'}")
 
     if is_confident and response:
         from shopee_client import send_message
-        await send_message(dict(user), conversation_id, response)
+        result = await send_message(dict(user), conversation_id, response)
+        print(f"[Webhook] Shopee自動返信送信 result={result}")
     else:
         if user["line_user_id"]:
             from line_client import send_notification
@@ -192,6 +198,9 @@ async def handle_shopee_chat_push(data: dict):
                 user["line_user_id"],
                 f"⚠️ 自動返信できないメッセージがあります\n\n購入者メッセージ:\n{buyer_message}\n\nShopeeセラーセンターで直接ご返信ください。"
             )
+            print(f"[Webhook] LINE通知送信完了 line_user_id={user['line_user_id']}")
+        else:
+            print(f"[Webhook] LINE未連携のため通知スキップ shop_id={shop_id}")
 
 
 @app.get("/admin/collect-faq", response_class=HTMLResponse)
