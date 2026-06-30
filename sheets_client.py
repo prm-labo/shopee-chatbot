@@ -1,11 +1,11 @@
 import os
+import json
 import time
 import gspread
 from google.oauth2.service_account import Credentials
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 SHEETS_ID = os.getenv("GOOGLE_SHEETS_ID", "")
-SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "google_service_account.json")
 
 _faq_cache: str = ""
 _cache_updated_at: int = 0
@@ -13,7 +13,9 @@ CACHE_TTL = 3600  # 1時間
 
 
 def _get_client():
-    creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+    service_account_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "")
+    creds_dict = json.loads(service_account_json)
+    creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     return gspread.authorize(creds)
 
 
@@ -33,7 +35,7 @@ def get_school_faq() -> str:
             return ""
 
         lines = []
-        for row in rows[1:]:  # 1行目はヘッダー
+        for row in rows[1:]:
             if len(row) >= 2 and row[0].strip() and row[1].strip():
                 lines.append(f"Q: {row[0].strip()}\nA: {row[1].strip()}")
 
@@ -43,4 +45,4 @@ def get_school_faq() -> str:
 
     except Exception as e:
         print(f"[Sheets] FAQ取得エラー: {e}")
-        return _faq_cache  # キャッシュがあれば返す
+        return _faq_cache
