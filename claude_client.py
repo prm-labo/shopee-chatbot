@@ -49,7 +49,11 @@ async def generate_response(
     text = message.content[0].text.strip()
 
     try:
-        data = json.loads(text)
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        if start == -1:
+            return "", False
+        data = json.loads(text[start:end])
         response = data.get("response", "")
         is_confident = data.get("confidence", "low") == "high"
         return response, is_confident
