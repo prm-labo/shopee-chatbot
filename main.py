@@ -152,14 +152,20 @@ async def handle_shopee_chat_push(data: dict):
     from line_client import send_notification
 
     shop_id = data.get("shop_id")
-    msg_data = data.get("data", {})
-    message_id = str(msg_data.get("message_id", ""))
-    conversation_id = str(msg_data.get("conversation_id", ""))
-    content = msg_data.get("content", {})
-    msg_type = content.get("type", "")
+    inner = data.get("data", {}).get("content", {})
+    message_id = str(inner.get("message_id", ""))
+    conversation_id = str(inner.get("conversation_id", ""))
+    msg_type = inner.get("message_type", "")
+    from_shop_id = inner.get("from_shop_id", 0)
+    content = inner.get("content", {})
     buyer_message = content.get("text", "").strip()
 
-    if not buyer_message or msg_type != "text":
+    print(f"[Webhook Parse] msg_type={msg_type} message_id={message_id} buyer_message={buyer_message[:50] if buyer_message else ''}")
+
+    if msg_type != "text" or not buyer_message:
+        return
+
+    if str(from_shop_id) == str(shop_id):
         return
 
     if is_message_processed(shop_id, message_id):
