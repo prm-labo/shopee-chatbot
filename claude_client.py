@@ -30,8 +30,7 @@ async def generate_response(
     school_faq: str,
     product_data: str,
 ) -> tuple[str, bool]:
-    """Returns (response_text, is_confident)"""
-    user_content = f"""## スクールFAQ
+    user_content = f"""## FAQ
 {school_faq}
 
 ## このショップの商品情報
