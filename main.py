@@ -125,6 +125,87 @@ async def line_webhook(request: Request):
     return {"status": "ok"}
 
 
+@app.post("/shopee/webhook")
+async def shopee_webhook(request: Request):
+    try:
+        data = await request.json()
+        code = data.get("code")
+
+        if code == 10:  # webchat_push
+            await handle_shopee_chat_push(data)
+
+        return {"status": "ok"}
+    except Exception as e:
+        print(f"[Shopee Webhook] エラー: {e}")
+        return {"status": "error"}
+
+
+async def handle_shopee_chat_push(data: dict):
+    from database import get_user_by_shop_id, is_message_processed, mark_message_processed
+    from claude_client import generate_response
+    from sheets_client import get_school_faq
+    from line_client import send_notification
+
+    shop_id = data.get("shop_id")
+    msg_data = data.get("data", {})
+    message_id = str(msg_data.get("message_id", ""))
+    conversation_id = str(msg_data.get("conversation_id", ""))
+    content = msg_data.get("content", {})
+    msg_type = content.get("type", "")
+    buyer_message = content.get("text", "").strip()
+
+    if not buyer_message or msg_type != "text":
+        return
+
+    if is_message_processed(shop_id, message_id):
+        return
+
+    mark_message_processed(shop_id, message_id)
+
+    user = get_user_by_shop_id(shop_id)
+    if not user:
+        return
+
+    school_faq = get_school_faq()
+    product_data = user["product_cache"] or ""
+
+    response, is_confident = await generate_response(buyer_message, school_faq, product_data)
+
+    if is_confident and response:
+        from shopee_client import send_message
+        await send_message(dict(user), conversation_id, response)
+    else:
+        if user["line_user_id"]:
+            from line_client import send_notification
+            await send_notification(
+                user["line_user_id"],
+                f"⚠️ 自動返信できないメッセージがあります\n\n購入者メッセージ:\n{buyer_message}\n\nShopeeセラーセンターで直接ご返信ください。"
+            )
+
+
+@app.get("/admin/collect-faq", response_class=HTMLResponse)
+async def admin_collect_faq():
+    try:
+        from collect_faq import collect_from_shop, write_to_sheets
+        from database import get_all_active_users
+        users = get_all_active_users()
+        if not users:
+            return "<h2>エラー：連携済みショップがありません</h2>"
+        all_qa = []
+        for user in users:
+            qa = await collect_from_shop(user["shop_id"], user["access_token"])
+            all_qa.extend(qa)
+        if all_qa:
+            write_to_sheets(all_qa)
+        return f"""
+        <h2>✅ FAQ収集完了</h2>
+        <p>収集件数：{len(all_qa)}件</p>
+        <p><a href='/'>トップに戻る</a></p>
+        """
+    except Exception as e:
+        return f"<h2>エラー</h2><pre>{e}</pre>"
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
