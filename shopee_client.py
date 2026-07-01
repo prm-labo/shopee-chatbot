@@ -97,7 +97,7 @@ async def get_messages(user: dict, conversation_id: str) -> list:
     return res.json().get("response", {}).get("messages", [])
 
 
-async def send_message(user: dict, conversation_id: str, message: str) -> bool:
+async def send_message(user: dict, to_id: int, message: str) -> bool:
     token = await _ensure_token(user)
     path = "/api/v2/sellerchat/send_message"
     params = _params(path, token, user["shop_id"])
@@ -106,12 +106,14 @@ async def send_message(user: dict, conversation_id: str, message: str) -> bool:
             f"{BASE_URL}/sellerchat/send_message",
             params=params,
             json={
-                "conversation_id": conversation_id,
+                "to_id": to_id,
                 "message_type": "text",
                 "content": {"text": message},
             },
         )
-    return res.json().get("error") == ""
+    result = res.json()
+    print(f"[send_message] to_id={to_id} error={result.get('error')} message={result.get('message')}")
+    return result.get("error") == ""
 
 
 async def get_products(user: dict) -> list:
